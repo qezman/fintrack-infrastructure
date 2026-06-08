@@ -37,3 +37,8 @@ output "db_endpoint" {
   description = "RDS PostgreSQL endpoint"
   value       = module.rds.db_endpoint
 }
+
+output "receipts_bucket_name" {
+  description = "S3 bucket name for receipt uploads"
+  value       = module.s3.bucket_name
+}

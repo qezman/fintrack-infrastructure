@@ -33,6 +33,9 @@ provider "aws" {
   }
 }
 
+data "aws_caller_identity" "current" {}
+
+
 module "vpc" {
   source             = "../../modules/vpc"
   project            = var.project
@@ -51,7 +54,7 @@ module "eks" {
 }
 
 module "rds" {
-  source = "../../modules/rds"
+  source                     = "../../modules/rds"
   project                    = var.project
   environment                = var.environment
   vpc_id                     = module.vpc.vpc_id
@@ -59,4 +62,11 @@ module "rds" {
   eks_node_security_group_id = module.eks.node_security_group_id
   db_username                = var.db_username
   db_password                = var.db_password
+}
+
+module "s3" {
+  source = "../../modules/s3"
+  project        = var.project
+  environment    = var.environment
+  aws_account_id = data.aws_caller_identity.current.account_id
 }
