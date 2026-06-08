@@ -176,3 +176,17 @@ resource "aws_eks_access_policy_association" "terraform_user_admin" {
 
   depends_on = [aws_eks_access_entry.terraform_user]
 }
+
+data "aws_security_group" "node" {
+  filter {
+    name   = "tag:aws:eks:cluster-name"
+    values = [aws_eks_cluster.main.name]
+  }
+
+  filter {
+    name   = "tag:kubernetes.io/cluster/${aws_eks_cluster.main.name}"
+    values = ["owned"]
+  }
+
+  depends_on = [aws_eks_node_group.main]
+}

@@ -27,3 +27,8 @@ output "node_group_role_arn" {
   description = "ARN of the node group IAM role"
   value       = aws_iam_role.node_group.arn
 }
+
+output "node_security_group_id" {
+  description = "Security group ID attached to EKS worker nodes"
+  value       = data.aws_security_group.node.id
+}

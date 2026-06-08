@@ -32,3 +32,8 @@ output "oidc_provider_arn" {
   description = "OIDC provider ARN for IRSA"
   value       = module.eks.oidc_provider_arn
 }
+
+output "db_endpoint" {
+  description = "RDS PostgreSQL endpoint"
+  value       = module.rds.db_endpoint
+}
