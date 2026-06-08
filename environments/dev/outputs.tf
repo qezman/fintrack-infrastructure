@@ -42,3 +42,23 @@ output "receipts_bucket_name" {
   description = "S3 bucket name for receipt uploads"
   value       = module.s3.bucket_name
 }
+
+output "github_actions_role_arn" {
+  description = "GitHub Actions IAM role ARN"
+  value       = module.iam.github_actions_role_arn
+}
+
+output "backend_role_arn" {
+  description = "Backend IRSA role ARN"
+  value       = module.iam.backend_role_arn
+}
+
+output "frontend_ecr_url" {
+  description = "Frontend ECR repository URL"
+  value       = module.iam.frontend_ecr_url
+}
+
+output "backend_ecr_url" {
+  description = "Backend ECR repository URL"
+  value       = module.iam.backend_ecr_url
+}
