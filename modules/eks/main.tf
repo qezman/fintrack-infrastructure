@@ -67,6 +67,11 @@ resource "aws_iam_role_policy_attachment" "ecr_policy" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
 }
 
+resource "aws_iam_role_policy_attachment" "elb_policy" {
+  role       = aws_iam_role.node_group.name
+  policy_arn = "arn:aws:iam::aws:policy/ElasticLoadBalancingFullAccess"
+}
+
 # Security Group (Control Plane)
 resource "aws_security_group" "cluster" {
   name        = "${var.project}-${var.environment}-eks-cluster-sg"

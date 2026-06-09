@@ -21,3 +21,5 @@ override.tf.json
 *_override.tf.json
 
 apply.log
+destroy.log
+environments/dev/cribe svc ingress-nginx-controller -n ingress-nginx
