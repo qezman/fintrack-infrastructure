@@ -47,11 +47,6 @@ resource "helm_release" "ingress_nginx" {
     value = "LoadBalancer"
   }
 
-  set {
-    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-type"
-    value = "nlb"
-  }
-
   # Don't wait for rollout
   wait    = false
   timeout = 600
