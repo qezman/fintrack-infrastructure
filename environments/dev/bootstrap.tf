@@ -114,3 +114,61 @@ resource "helm_release" "argocd" {
     helm_release.cert_manager
   ]
 }
+
+# Monitoring
+resource "kubernetes_namespace" "monitoring" {
+  metadata {
+    name = "monitoring"
+  }
+}
+
+resource "helm_release" "kube_prometheus_stack" {
+  name       = "kube-prometheus-stack"
+  repository = "https://prometheus-community.github.io/helm-charts"
+  chart      = "kube-prometheus-stack"
+  namespace  = kubernetes_namespace.monitoring.metadata[0].name
+  version    = "58.2.2"
+
+  set {
+    name  = "prometheus.prometheusSpec.resources.requests.memory"
+    value = "256Mi"
+  }
+
+  set {
+    name  = "prometheus.prometheusSpec.resources.limits.memory"
+    value = "512Mi"
+  }
+
+  set {
+    name  = "alertmanager.enabled"
+    value = "false"
+  }
+
+  set {
+    name  = "grafana.adminPassword"
+    value = "fintrack-grafana-2026"
+  }
+
+  set {
+    name  = "grafana.ingress.enabled"
+    value = false
+  }
+
+  # Enable ArgoCD metrics scraping
+  set {
+    name  = "prometheus.prometheusSpec.podMonitorSelectorNilUsesHelmValues"
+    value = "false"
+  }
+
+  set {
+    name  = "prometheus.prometheusSpec.serviceMonitorSelectorNilUsesHelmValues"
+    value = "false"
+  }
+  wait    = false
+  timeout = 600
+
+  depends_on = [
+    kubernetes_namespace.monitoring,
+    helm_release.ingress_nginx
+  ]
+}
