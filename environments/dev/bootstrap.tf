@@ -61,11 +61,11 @@ resource "helm_release" "ingress_nginx" {
     name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-ssl-ports"
     value = "https"
   }
-  
+
   set {
-  name  = "controller.service.targetPorts.https"
-  value = "http"
-}
+    name  = "controller.service.targetPorts.https"
+    value = "http"
+  }
 
   # Don't wait for rollout
   wait    = false
@@ -169,12 +169,42 @@ resource "helm_release" "kube_prometheus_stack" {
             - matchers:
                 - alertname = "Watchdog"
               receiver: "null"
+            - matchers:
+                - severity = "critical"
+              receiver: discord
+            - matchers:
+                - severity = "warning"
+              receiver: email-telegram
+            - matchers:
+                - severity = "info"
+              receiver: slack
         receivers:
           - name: "null"
           - name: email
             email_configs:
               - to: "holaryinka5050@gmail.com"
                 send_resolved: true
+          - name: discord
+            slack_configs:
+              - api_url: "${var.discord_webhook_url}"
+                send_resolved: true
+                title: '{{ .GroupLabels.alertname }}'
+                text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+          - name: email-telegram
+            email_configs:
+              - to: "holaryinka5050@gmail.com"
+                send_resolved: true
+            telegram_configs:
+              - bot_token: "${var.telegram_bot_token}"
+                chat_id: ${var.telegram_chat_id}
+                send_resolved: true
+          - name: slack
+            slack_configs:
+              - api_url: "${var.slack_webhook_url}"
+                channel: "#fintrack-alerts"
+                send_resolved: true
+                title: '{{ .GroupLabels.alertname }}'
+                text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
     prometheus:
       prometheusSpec:
         resources:

@@ -71,5 +71,28 @@ variable "elb_zone_id" {
 variable "certificate_arn" {
   description = "ACM certificate ARN"
   type        = string
-  default = "443"
+  default     = "443"
+}
+
+variable "slack_webhook_url" {
+  description = "Slack incoming webhook URL"
+  type        = string
+  sensitive   = true
+}
+
+variable "telegram_bot_token" {
+  description = "Telegram bot token"
+  type        = string
+  sensitive   = true
+}
+
+variable "telegram_chat_id" {
+  description = "Telegram chat ID"
+  type        = string
+}
+
+variable "discord_webhook_url" {
+  description = "Discord webhook URL"
+  type        = string
+  sensitive   = true
 }
