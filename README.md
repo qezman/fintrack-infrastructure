@@ -8,7 +8,6 @@ Architecture Diagram
 
 ## Stack
 
-
 | Layer         | Technology                                       |
 | ------------- | ------------------------------------------------ |
 | Cloud         | AWS (EKS, RDS, S3, ECR, IAM, IRSA)               |
@@ -23,7 +22,6 @@ Architecture Diagram
 | DNS           | Route53                                          |
 | DB Migrations | Prisma Migrate via Kubernetes Job in CI          |
 
-
 ## Repository Structure
 
 ```
@@ -33,13 +31,11 @@ fintrack-frontend/         - React + Vite application
 fintrack-backend/          - Node.js + Fastify + Prisma API
 ```
 
-
 | Repo                                                             | Description                               |
 | ---------------------------------------------------------------- | ----------------------------------------- |
 | [fintrack-frontend](https://github.com/qezman/fintrack-frontend) | React + Vite frontend                     |
 | [fintrack-backend](https://github.com/qezman/fintrack-backend)   | Fastify + Prisma + PostgreSQL API         |
 | [fintrack-gitops](https://github.com/qezman/fintrack-gitops)     | GitOps manifests - ArgoCD source of truth |
-
 
 ## Key Engineering Decisions
 
@@ -55,7 +51,6 @@ fintrack-backend/          - Node.js + Fastify + Prisma API
 
 ## Infrastructure Components
 
-
 | Component | Details                                                                    |
 | --------- | -------------------------------------------------------------------------- |
 | VPC       | 10.0.0.0/16, 2 public + 2 private subnets across us-east-1a and us-east-1b |
@@ -63,7 +58,6 @@ fintrack-backend/          - Node.js + Fastify + Prisma API
 | RDS       | PostgreSQL 16, db.t3.micro, private subnets only                           |
 | S3        | Private bucket for receipt uploads, presigned URL access                   |
 | ECR       | Private image registry, 10-image lifecycle policy                          |
-
 
 ## Remote State
 
@@ -211,6 +205,12 @@ kubectl port-forward -n monitoring svc/alertmanager-operated 9093:9093
 - Grafana: `http://localhost:3000` - username: `admin` | password: `fintrack-grafana-2025` - Prometheus: `http://localhost:9091` - Alertmanager: `http://localhost:9093`
 
 > Destroy when not in use: `terraform destroy -auto-approve`
+
+## Documentation
+
+Full setup guide, architecture decisions, and redeployment walkthrough:
+
+[FinTrack Platform Documentation]([https://polarized-boater-990.notion.site/FinTrack-EKS-Platform-38d604d0a68980168e51cf384b92a454])
 
 ## Author
 
