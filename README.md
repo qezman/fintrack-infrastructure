@@ -206,6 +206,10 @@ kubectl port-forward -n monitoring svc/alertmanager-operated 9093:9093
 
 > Destroy when not in use: `terraform destroy -auto-approve`
 
+## NB
+
+-target: Used only for the Phase 1 -> Phase 2 bootstrap split, where the Kubernetes provider requires the EKS cluster to exist first. Not used for routine changes — regular terraform apply is preferred once the cluster is bootstrapped.
+
 ## Documentation
 
 Full setup guide, architecture decisions, and redeployment walkthrough:
