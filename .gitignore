@@ -22,6 +22,7 @@ override.tf.json
 
 apply.log
 destroy.log
+destroy2.log
 environments/dev/cribe svc ingress-nginx-controller -n ingress-nginx
 environments/dev/apply2.log
 environments/dev/apply2.logexport      
