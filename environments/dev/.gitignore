@@ -2,3 +2,4 @@ apply.log
 destroy.log
 cribe svc ingress-nginx-controller -n ingress-nginx
 destroy2.log
+apply_new_account.log
