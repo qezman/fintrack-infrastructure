@@ -1,101 +1,3 @@
-# Namespaces
-resource "kubernetes_namespace" "ingress_nginx" {
-  metadata {
-    name = "ingress-nginx"
-  }
-}
-
-resource "kubernetes_namespace" "argocd" {
-  metadata {
-    name = "argocd"
-  }
-}
-
-resource "kubernetes_namespace" "fintrack" {
-  metadata {
-    name = "fintrack"
-  }
-}
-
-# nginx-ingress
-resource "helm_release" "ingress_nginx" {
-  name       = "ingress-nginx"
-  repository = "https://kubernetes.github.io/ingress-nginx"
-  chart      = "ingress-nginx"
-  namespace  = kubernetes_namespace.ingress_nginx.metadata[0].name
-  version    = "4.10.1"
-
-  set {
-    name  = "controller.service.type"
-    value = "LoadBalancer"
-  }
-
-  set {
-    name  = "controller.service.type"
-    value = "LoadBalancer"
-  }
-
-  set {
-    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-ssl-cert"
-    value = var.certificate_arn
-  }
-
-  set {
-    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-backend-protocol"
-    value = "http"
-  }
-
-  set {
-    name  = "controller.service.annotations.service\\.beta\\.kubernetes\\.io/aws-load-balancer-ssl-ports"
-    value = "https"
-  }
-
-  set {
-    name  = "controller.service.targetPorts.https"
-    value = "http"
-  }
-
-  # Don't wait for rollout
-  wait    = false
-  timeout = 600
-
-  depends_on = [kubernetes_namespace.ingress_nginx]
-}
-
-# ArgoCD
-resource "helm_release" "argocd" {
-  name       = "argocd"
-  repository = "https://argoproj.github.io/argo-helm"
-  chart      = "argo-cd"
-  namespace  = kubernetes_namespace.argocd.metadata[0].name
-  version    = "6.7.18"
-
-  set {
-    name  = "dex.enabled"
-    value = "false"
-  }
-
-  set {
-    name  = "notifications.enabled"
-    value = "false"
-  }
-
-  wait    = false
-  timeout = 600
-
-  depends_on = [
-    kubernetes_namespace.argocd,
-    helm_release.ingress_nginx,
-  ]
-}
-
-# Monitoring
-resource "kubernetes_namespace" "monitoring" {
-  metadata {
-    name = "monitoring"
-  }
-}
-
 resource "helm_release" "kube_prometheus_stack" {
   name       = "kube-prometheus-stack"
   repository = "https://prometheus-community.github.io/helm-charts"
@@ -205,13 +107,6 @@ resource "helm_release" "kube_prometheus_stack" {
   ]
 }
 
-resource "null_resource" "coredns_fix" {
-  provisioner "local-exec" {
-    command     = "kubectl get configmap coredns -n kube-system -o yaml | sed 's|forward . /etc/resolv.conf|forward . 8.8.8.8 8.8.4.4|g' | kubectl apply -f - && kubectl rollout restart deployment coredns -n kube-system"
-    interpreter = ["/bin/bash", "-c"]
-  }
-}
-
 # Loki - log aggregation
 resource "helm_release" "loki" {
   name       = "loki"
@@ -300,33 +195,3 @@ resource "helm_release" "promtail" {
   depends_on = [helm_release.loki]
 }
 
-# External Secrets Operator namespace
-resource "kubernetes_namespace" "external_secrets" {
-  metadata {
-    name = "external-secrets"
-  }
-}
-
-# External Secrets Operator
-resource "helm_release" "external_secrets" {
-  name       = "external-secrets"
-  repository = "https://charts.external-secrets.io"
-  chart      = "external-secrets"
-  namespace  = kubernetes_namespace.external_secrets.metadata[0].name
-  version    = "0.9.20"
-
-  set {
-    name  = "installCRDs"
-    value = "true"
-  }
-
-  set {
-    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
-    value = module.external_secrets.role_arn
-  }
-
-  wait    = false
-  timeout = 600
-
-  depends_on = [kubernetes_namespace.external_secrets]
-}
