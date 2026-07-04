@@ -5,18 +5,6 @@ resource "kubernetes_namespace" "ingress_nginx" {
   }
 }
 
-resource "kubernetes_namespace" "cert_manager" {
-  metadata {
-    name = "cert-manager"
-  }
-}
-
-resource "kubernetes_namespace" "sealed_secrets" {
-  metadata {
-    name = "sealed-secrets"
-  }
-}
-
 resource "kubernetes_namespace" "argocd" {
   metadata {
     name = "argocd"
@@ -74,39 +62,6 @@ resource "helm_release" "ingress_nginx" {
   depends_on = [kubernetes_namespace.ingress_nginx]
 }
 
-# cert-manager
-resource "helm_release" "cert_manager" {
-  name       = "cert-manager"
-  repository = "https://charts.jetstack.io"
-  chart      = "cert-manager"
-  namespace  = kubernetes_namespace.cert_manager.metadata[0].name
-  version    = "v1.14.5"
-
-  set {
-    name  = "installCRDs"
-    value = "true"
-  }
-
-  wait    = false
-  timeout = 600
-
-  depends_on = [kubernetes_namespace.cert_manager]
-}
-
-# Sealed Secrets
-resource "helm_release" "sealed_secrets" {
-  name       = "sealed-secrets"
-  repository = "https://bitnami.github.io/sealed-secrets"
-  chart      = "sealed-secrets"
-  namespace  = kubernetes_namespace.sealed_secrets.metadata[0].name
-  version    = "2.15.3"
-
-  wait    = false
-  timeout = 600
-
-  depends_on = [kubernetes_namespace.sealed_secrets]
-}
-
 # ArgoCD
 resource "helm_release" "argocd" {
   name       = "argocd"
@@ -131,7 +86,6 @@ resource "helm_release" "argocd" {
   depends_on = [
     kubernetes_namespace.argocd,
     helm_release.ingress_nginx,
-    helm_release.cert_manager
   ]
 }
 
@@ -256,8 +210,6 @@ resource "null_resource" "coredns_fix" {
     command     = "kubectl get configmap coredns -n kube-system -o yaml | sed 's|forward . /etc/resolv.conf|forward . 8.8.8.8 8.8.4.4|g' | kubectl apply -f - && kubectl rollout restart deployment coredns -n kube-system"
     interpreter = ["/bin/bash", "-c"]
   }
-
-  depends_on = [helm_release.cert_manager]
 }
 
 # Loki - log aggregation
@@ -268,7 +220,7 @@ resource "helm_release" "loki" {
   namespace  = kubernetes_namespace.monitoring.metadata[0].name
   version    = "6.6.4"
 
-values = [<<-YAML
+  values = [<<-YAML
   deploymentMode: SingleBinary
   loki:
     commonConfig:
@@ -308,7 +260,7 @@ values = [<<-YAML
   gateway:
     enabled: false
 YAML
-]
+  ]
 
   set {
     name  = "test.enabled"
@@ -346,4 +298,35 @@ resource "helm_release" "promtail" {
   timeout = 600
 
   depends_on = [helm_release.loki]
+}
+
+# External Secrets Operator namespace
+resource "kubernetes_namespace" "external_secrets" {
+  metadata {
+    name = "external-secrets"
+  }
+}
+
+# External Secrets Operator
+resource "helm_release" "external_secrets" {
+  name       = "external-secrets"
+  repository = "https://charts.external-secrets.io"
+  chart      = "external-secrets"
+  namespace  = kubernetes_namespace.external_secrets.metadata[0].name
+  version    = "0.9.20"
+
+  set {
+    name  = "installCRDs"
+    value = "true"
+  }
+
+  set {
+    name  = "serviceAccount.annotations.eks\\.amazonaws\\.com/role-arn"
+    value = module.external_secrets.role_arn
+  }
+
+  wait    = false
+  timeout = 600
+
+  depends_on = [kubernetes_namespace.external_secrets]
 }
