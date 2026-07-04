@@ -96,3 +96,15 @@ variable "discord_webhook_url" {
   type        = string
   sensitive   = true
 }
+
+variable "database_url" {
+  description = "Backend Database_URL for Secrets Manager"
+  type        = string
+  sensitive   = true
+}
+
+variable "jwt_secret" {
+  description = "Backend JWT_SECRET for Secrets Manager"
+  type        = string
+  sensitive   = true
+}

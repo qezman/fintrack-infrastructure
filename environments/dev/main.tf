@@ -124,3 +124,13 @@ module "dns" {
   elb_dns_name = var.elb_dns_name
   elb_zone_id  = var.elb_zone_id
 }
+
+module "external_secrets" {
+  source            = "../../modules/external-secrets"
+  project           = var.project
+  environment       = var.environment
+  oidc_provider_arn = module.eks.oidc_provider_arn
+  oidc_provider_url = module.eks.oidc_provider_url
+  database_url      = var.database_url
+  jwt_secret        = var.jwt_secret
+}
