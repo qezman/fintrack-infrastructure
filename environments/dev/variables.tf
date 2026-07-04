@@ -71,7 +71,7 @@ variable "elb_zone_id" {
 variable "certificate_arn" {
   description = "ACM certificate ARN"
   type        = string
-  default     = "443"
+  default     = ""
 }
 
 variable "slack_webhook_url" {
