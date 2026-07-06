@@ -4,7 +4,7 @@ GitOps infrastructure for [FinTrack] - a personal finance tracker deployed on AW
 
 ## Architecture Overview
 
-Architecture Diagram
+![Infrastructure Architecture](./architecture.gif)
 
 ## Stack
 
