@@ -210,11 +210,11 @@ kubectl port-forward -n monitoring svc/alertmanager-operated 9093:9093
 
 -target: Used only for the Phase 1 -> Phase 2 bootstrap split, where the Kubernetes provider requires the EKS cluster to exist first. Not used for routine changes — regular terraform apply is preferred once the cluster is bootstrapped.
 
-## Documentation
+<!-- ## Documentation
 
 Full setup guide, architecture decisions, and redeployment walkthrough:
 
-[FinTrack Platform Documentation](https://polarized-boater-990.notion.site/FinTrack-EKS-Platform-38d604d0a68980168e51cf384b92a454)
+[FinTrack Platform Documentation](https://polarized-boater-990.notion.site/FinTrack-EKS-Platform-38d604d0a68980168e51cf384b92a454) -->
 
 ## Author
 
