@@ -1,6 +1,6 @@
 # FinTrack Infrastructure
 
-GitOps infrastructure for [FinTrack] - a personal finance tracker deployed on AWS EKS with a complete DevOps pipeline - Terraform-provisioned infrastructure, GitOps delivery via ArgoCD, zero-downtime rolling updates, horizontal pod autoscaling, and end-to-end observability using Prometheus, Alertmanager, and Grafana.
+GitOps infrastructure for [FinTrack] - a personal finance tracker deployed on AWS EKS with a complete DevOps pipeline: Terraform-provisioned infrastructure, GitOps delivery via ArgoCD, canary deployments via Argo Rollouts, policy enforcement via Kyverno, live secrets via External Secrets Operator, and end-to-end observability using Prometheus, Loki, Alertmanager, and Grafana.
 
 ## Architecture Overview
 
@@ -8,19 +8,22 @@ GitOps infrastructure for [FinTrack] - a personal finance tracker deployed on AW
 
 ## Stack
 
-| Layer         | Technology                                       |
-| ------------- | ------------------------------------------------ |
-| Cloud         | AWS (EKS, RDS, S3, ECR, IAM, IRSA)               |
-| IaC           | Terraform (modular, remote state)                |
-| Orchestration | Kubernetes 1.31 on EKS (3-node, t3.small)        |
-| CI            | GitHub Actions with OIDC (no stored credentials) |
-| CD            | ArgoCD (pull-based GitOps)                       |
-| Secrets       | Bitnami Sealed Secrets                           |
-| TLS           | AWS ACM                                          |
-| Ingress       | nginx-ingress + Classic ELB                      |
-| Monitoring    | Prometheus + Grafana + Alertmanager              |
-| DNS           | Route53                                          |
-| DB Migrations | Prisma Migrate via Kubernetes Job in CI          |
+| Layer                | Technology                                             |
+| -------------------- | ------------------------------------------------------ |
+| Cloud                | AWS (EKS, RDS, S3, ECR, IAM, IRSA, Secrets Manager)    |
+| IaC                  | Terraform (modular, remote state, feature-based files) |
+| Orchestration        | Kubernetes 1.31 on EKS (5-node, t3.small)              |
+| CI                   | GitHub Actions with OIDC (no stored credentials)       |
+| CD                   | ArgoCD (pull-based GitOps)                             |
+| Progressive Delivery | Argo Rollouts (canary: 20% → 50% → 100%)               |
+| Policy Enforcement   | Kyverno (image trust, non-root containers)             |
+| Secrets              | External Secrets Operator + AWS Secrets Manager        |
+| TLS                  | AWS ACM (terminated at ELB)                            |
+| Ingress              | nginx-ingress + Classic ELB                            |
+| Monitoring           | Prometheus + Alertmanager + Grafana                    |
+| Logging              | Loki + Promtail                                        |
+| DNS                  | Route 53                                               |
+| DB Migrations        | Prisma Migrate via Kubernetes Job in CI                |
 
 ## Repository Structure
 
@@ -41,30 +44,33 @@ fintrack-backend/          - Node.js + Fastify + Prisma API
 
 - **GitOps over push-based CD** - ArgoCD pulls from Git rather than CI pushing to the cluster. Deployments are auditable, reversible, and drift is auto-corrected.
 - **OIDC over stored credentials** - GitHub Actions assumes an IAM role via OpenID Connect. No AWS keys stored anywhere.
-- **IRSA over instance profiles** - The backend pod assumes a scoped IAM role via Kubernetes service account annotation. S3 access is pod-specific, not node-wide.
-- **Sealed Secrets over plaintext** - Secrets are encrypted with the cluster's public key before being committed to Git. The private key never leaves the cluster.
-- **Modular Terraform** - Each infrastructure component (VPC, EKS, RDS, S3, IAM) is an independent reusable module. The environment layer wires them together.
-- **Rolling updates over recreate** - `maxSurge: 1 / maxUnavailable: 0` ensures new pods are healthy before old ones are terminated. Zero downtime on every deploy.
-- **HPA over fixed replicas** - Backend scales from 2 to 5 replicas automatically based on CPU (70%) and memory (80%) utilization.
-- **Kubernetes Job for migrations** - Prisma migrations run inside the cluster as a Job on every CI push, ensuring DB schema is always in sync before the new image is deployed.
-- **Alertmanager routing** - Watchdog heartbeat routed to null receiver. All real alerts routed to email with **send_resolved: true** for automatic resolution notifications.
+- **IRSA over instance profiles** - Backend pod and External Secrets Operator each assume scoped IAM roles. Access is pod-specific, not node-wide.
+- **External Secrets over Sealed Secrets** - Secrets are fetched live from AWS Secrets Manager at runtime via IRSA. Nothing sensitive touches Git; rebuilding the cluster requires no re-encryption step.
+- **Canary deployments (Argo Rollouts) over plain rolling updates** - New backend versions receive 20% → 50% → 100% of traffic with pauses for verification before full promotion.
+- **Policy-as-code (Kyverno)** - Cluster-wide admission rules block non-ECR images and containers without a non-root security context.
+- **AWS ACM over cert-manager + Let's Encrypt** - TLS terminates at the load balancer and renews automatically.
+- **Modular Terraform** - Each infrastructure component is an independent module; bootstrap resources are split into feature-based files rather than one monolithic file.
+- **HPA over fixed replicas** - Backend scales 2–5 replicas on CPU (70%) and memory (80%) utilization.
+- **Kubernetes Job for migrations** - Prisma migrations run as a CI-owned Job inside the cluster on every push, not tracked in GitOps since it's ephemeral.
+- **Multi-channel Alertmanager routing** - Critical → Discord, warning → Email + Telegram, info → Slack.
 
 ## Infrastructure Components
 
-| Component | Details                                                                    |
-| --------- | -------------------------------------------------------------------------- |
-| VPC       | 10.0.0.0/16, 2 public + 2 private subnets across us-east-1a and us-east-1b |
-| EKS       | Kubernetes 1.31, t3.small nodes, managed node group                        |
-| RDS       | PostgreSQL 16, db.t3.micro, private subnets only                           |
-| S3        | Private bucket for receipt uploads, presigned URL access                   |
-| ECR       | Private image registry, 10-image lifecycle policy                          |
+| Component       | Details                                                                    |
+| --------------- | -------------------------------------------------------------------------- |
+| VPC             | 10.0.0.0/16, 2 public + 2 private subnets across us-east-1a and us-east-1b |
+| EKS             | Kubernetes 1.31, t3.small nodes (5), managed node group                    |
+| RDS             | PostgreSQL 16, db.t3.micro, private subnets only                           |
+| S3              | Private bucket for receipt uploads, presigned URL access                   |
+| ECR             | Private image registry, 10-image lifecycle policy                          |
+| Secrets Manager | Backend credentials (DATABASE_URL, JWT_SECRET), pulled via IRSA            |
 
 ## Remote State
 
 Terraform state is stored remotely in S3 with DynamoDB locking:
 
 ```
-S3 Bucket:      terraform-fintrack-state-203637463799
+S3 Bucket:      terraform-fintrack-state-<account-id>
 DynamoDB Table: fintrack-terraform-locks
 Region:         us-east-1
 ```
@@ -78,19 +84,23 @@ Push to main
   → Run Prisma migration Job inside cluster (VPC access to RDS)
   → Wait for migration to complete
   → Update image tag in fintrack-gitops
-  → ArgoCD detects change → rolling update deploy
+→ ArgoCD detects change
+→ Argo Rollouts progresses canary (20% → 50% → 100%)
+→ Kyverno validates the new pod on admission
 ```
 
 ## Observability
 
 - **Prometheus** - scrapes cluster and app metrics via kube-prometheus-stack
-- **Alertmanager** - routes alerts to email; null receiver for Watchdog heartbeat
+- **Loki + Promtail** - log aggregation, one Promtail pod per node
+- **Alertmanager** - routes alerts by severity: critical → Discord, warning → Email + Telegram, info → Slack
 - **Grafana** - dashboards for cluster health, pod resources, and alert status
 - **Custom PrometheusRule** - alert rules defined as code, version-controlled in Git
 
-## Remote State
+## Security & Policy
 
-Terraform state is stored remotely in S3 with DynamoDB locking:
+- **Kyverno** - `disallow-root-containers` and `restrict-image-registries` cluster policies, currently in Audit mode
+- **External Secrets Operator** - live secret sync from AWS Secrets Manager, no secrets stored in Git
 
 ## Getting Started
 
@@ -100,7 +110,7 @@ Terraform state is stored remotely in S3 with DynamoDB locking:
 - Terraform >= 1.5.0
 - kubectl
 - Helm >= 3.0
-- kubeseal
+- kubectl-argo-rollouts CLI plugin
 
 ### Phase 1 - Infrastructure
 
@@ -123,7 +133,8 @@ terraform apply \
 # Reconnect kubectl
 aws eks update-kubeconfig --name fintrack-dev --region us-east-1
 
-# Phase 2: Cluster bootstrap (ArgoCD, nginx-ingress, cert-manager, sealed-secrets)
+# Phase 2: Cluster bootstrap (ArgoCD, nginx-ingress, monitoring, Loki,
+# Kyverno, External Secrets Operator, Argo Rollouts)
 terraform apply -auto-approve
 ```
 
@@ -133,12 +144,12 @@ terraform apply -auto-approve
 # Grant cluster access
 aws eks create-access-entry \
   --cluster-name fintrack-dev \
-  --principal-arn arn:aws:iam::203637463799:user/eks-project-user \
+  --principal-arn arn:aws:iam::<account-id>:user/eks-project-user \
   --region us-east-1 2>/dev/null || true
 
 aws eks associate-access-policy \
   --cluster-name fintrack-dev \
-  --principal-arn arn:aws:iam::203637463799:user/eks-project-user \
+  --principal-arn arn:aws:iam::<account-id>:user/eks-project-user \
   --policy-arn arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy \
   --access-scope type=cluster \
   --region us-east-1
@@ -152,29 +163,17 @@ kubectl apply -f fintrack-gitops/apps/cluster.yaml
 ### Phase 3 - Secrets
 
 ```bash
-# Reseal secrets for new cluster
-cat > /tmp/backend-secret.yaml << 'SECRETEOF'
-apiVersion: v1
-kind: Secret
-metadata:
-  name: fintrack-backend-secrets
-  namespace: fintrack
-type: Opaque
-stringData:
-  DATABASE_URL: "postgresql://fintrack_admin:<password>@<rds-endpoint>:5432/fintrack"
-  JWT_SECRET: "<your-jwt-secret>"
-SECRETEOF
+# Store/update backend secret in AWS Secrets Manager
+aws secretsmanager put-secret-value \
+  --secret-id fintrack-dev-backend-secrets \
+  --secret-string '{"DATABASE_URL":"postgresql://fintrack_admin:<password>@<rds-endpoint>:5432/fintrack","JWT_SECRET":"<your-jwt-secret>"}' \
+  --region us-east-1
 
-kubeseal \
-  --controller-name sealed-secrets \
-  --controller-namespace sealed-secrets \
-  --format yaml \
-  < /tmp/backend-secret.yaml \
-  > fintrack-gitops/manifests/backend/sealedsecret.yaml
+# Apply the ClusterSecretStore and ExternalSecret
+kubectl apply -f fintrack-gitops/manifests/backend/secretstore.yaml
+kubectl apply -f fintrack-gitops/manifests/backend/externalsecret.yaml
 
-rm /tmp/backend-secret.yaml
-cd fintrack-gitops && git add manifests/backend/sealedsecret.yaml
-git commit && git push
+kubectl get externalsecret -n fintrack
 ```
 
 ### Phase 4 - Database
@@ -183,32 +182,38 @@ git commit && git push
 # Migrations run automatically via CI on every push to main.
 # To run manually:
 kubectl run prisma-migrate \
-  --image=203637463799.dkr.ecr.us-east-1.amazonaws.com/fintrack-backend:latest \
+  --image=<account-id>.dkr.ecr.us-east-1.amazonaws.com/fintrack-backend:latest \
   --restart=Never \
   --namespace=fintrack \
-  --overrides='{"spec":{"containers":[{"name":"prisma-migrate","image":"203637463799.dkr.ecr.us-east-1.amazonaws.com/fintrack-backend:latest","command":["npx","prisma","migrate","deploy"],"envFrom":[{"secretRef":{"name":"fintrack-backend-secrets"}}]}],"serviceAccountName":"fintrack-backend"}}'
+  --overrides='{"spec":{"containers":[{"name":"prisma-migrate","image":"<account-id>.dkr.ecr.us-east-1.amazonaws.com/fintrack-backend:latest","command":["npx","prisma","migrate","deploy"],"envFrom":[{"secretRef":{"name":"fintrack-backend-secrets"}}]}],"serviceAccountName":"fintrack-backend"}}'
 ```
 
 ## Monitoring
 
 ```bash
-# Access Grafana
+# Grafana
 kubectl port-forward -n monitoring svc/kube-prometheus-stack-grafana 3000:80
 
-# Access Prometheus
+# Prometheus
 kubectl port-forward -n monitoring svc/prometheus-operated 9091:9090
 
-# Access Alertmanager
+# Alertmanager
 kubectl port-forward -n monitoring svc/alertmanager-operated 9093:9093
+
+# Argo Rollouts dashboard
+kubectl port-forward svc/argo-rollouts-dashboard -n argo-rollouts 3100:3100
 ```
 
-- Grafana: `http://localhost:3000` - username: `admin` | password: `fintrack-grafana-2025` - Prometheus: `http://localhost:9091` - Alertmanager: `http://localhost:9093`
+- Grafana: `http://localhost:3000` - username: `admin` | password: `fintrack-grafana-2025`
+- Prometheus: `http://localhost:9091`
+- Alertmanager: `http://localhost:9093`
+- Argo Rollouts: `http://localhost:3100`
 
 > Destroy when not in use: `terraform destroy -auto-approve`
 
 ## NB
 
--target: Used only for the Phase 1 -> Phase 2 bootstrap split, where the Kubernetes provider requires the EKS cluster to exist first. Not used for routine changes — regular terraform apply is preferred once the cluster is bootstrapped.
+`-target` is used only for the Phase 1 → Phase 2 bootstrap split, where the Kubernetes provider requires the EKS cluster to exist first. Not used for routine changes - regular `terraform apply` is preferred once the cluster is bootstrapped.
 
 ## Documentation
 
