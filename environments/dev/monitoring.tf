@@ -71,7 +71,6 @@ resource "helm_release" "kube_prometheus_stack" {
         podMonitorSelectorNilUsesHelmValues: false
         serviceMonitorSelectorNilUsesHelmValues: false
     grafana:
-      adminPassword: "fintrack-grafana-2025"
       ingress:
         enabled: false
   YAML
@@ -80,7 +79,7 @@ resource "helm_release" "kube_prometheus_stack" {
   # grafana
   set {
     name  = "grafana.adminPassword"
-    value = "fintrack-grafana-2026"
+    value = var.grafana_admin_password
   }
 
   set {
