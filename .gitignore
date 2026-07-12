@@ -20,12 +20,16 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 
+# Terraform operation logs
 apply.log
 destroy.log
 destroy2.log
 destroy_final.log
 destroy_final2.log
-environments/dev/cribe svc ingress-nginx-controller -n ingress-nginx
 environments/dev/apply2.log
-environments/dev/apply2.logexport      
+environments/dev/apply2.logexport
+environments/dev/cribe svc ingress-nginx-controller -n ingress-nginx
+*.log
+*.logexport
+
 terraform-ansible-jenkins.gif

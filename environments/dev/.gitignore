@@ -1,5 +1,12 @@
+# Terraform operation logs
 apply.log
 destroy.log
-cribe svc ingress-nginx-controller -n ingress-nginx
 destroy2.log
 apply_new_account.log
+terraform_debug.log
+apply2.log
+apply2.logexport
+cribe svc ingress-nginx-controller -n ingress-nginx
+
+*.log
+*.logexport
