@@ -16,7 +16,7 @@ resource "helm_release" "kyverno" {
   }
 
   set {
-    name  = "resource.requests.memory"
+    name  = "resource.requests.cpu"
     value = "50m"
   }
 
