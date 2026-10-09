@@ -204,7 +204,7 @@ kubectl port-forward -n monitoring svc/alertmanager-operated 9093:9093
 kubectl port-forward svc/argo-rollouts-dashboard -n argo-rollouts 3100:3100
 ```
 
-- Grafana: `http://localhost:3000` - username: `admin` | password: `fintrack-grafana-2025`
+- Grafana: `http://localhost:3000` - username: `admin` | password: ``
 - Prometheus: `http://localhost:9091`
 - Alertmanager: `http://localhost:9093`
 - Argo Rollouts: `http://localhost:3100`
