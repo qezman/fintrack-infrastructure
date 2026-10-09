@@ -70,8 +70,9 @@ resource "aws_ecr_lifecycle_policy" "backend" {
 }
 
 # GitHub Actions OIDC
-data "aws_iam_openid_connect_provider" "github" {
-  url = "https://token.actions.githubusercontent.com"
+resource "aws_iam_openid_connect_provider" "github" {
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
 }
 
 # IAM role that GitHub Actions assumes during CI runs
@@ -86,7 +87,7 @@ resource "aws_iam_role" "github_actions" {
         Effect = "Allow"
         Principal = {
           # The GitHub OIDC provider is the trusted entity
-          Federated = data.aws_iam_openid_connect_provider.github.arn
+          Federated = aws_iam_openid_connect_provider.github.arn
         }
         Action = "sts:AssumeRoleWithWebIdentity"
         Condition = {

@@ -2,6 +2,7 @@
 *.tfstate
 *.tfstate.backup
 *.tfstate.lock.info
+environments/dev/terraform.tfvars
 
 # Terraform working directory
 .terraform/
@@ -9,6 +10,7 @@
 
 # Variable files
 *.tfvars
+!environments/dev/terraform.example.tfvars
 
 # Crash logs
 crash.log
@@ -32,4 +34,4 @@ environments/dev/cribe svc ingress-nginx-controller -n ingress-nginx
 *.log
 *.logexport
 
-terraform-ansible-jenkins.gif
+Note.md

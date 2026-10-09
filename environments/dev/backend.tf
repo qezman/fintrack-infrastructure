@@ -1,9 +1,9 @@
 terraform {
   backend "s3" {
-    bucket         = "terraform-fintrack-state-560205084952"
-    key            = "fintrack/dev/terraform.tfstate"
-    region         = "us-east-1"
-    dynamodb_table = "fintrack-terraform-locks"
-    encrypt        = true
+    bucket       = "fintrack-state-722965867897"
+    key          = "fintrack/dev/terraform.tfstate"
+    region       = "us-east-1"
+    use_lockfile = true
+    encrypt      = true
   }
 }
