@@ -42,13 +42,15 @@ jobs:
         # Swaps the GitHub OIDC token for short-lived credentials on the read-only role
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{vars.AWS_REVIEW_ROLE_ARN}}
+          role-to-assume: ${{vars.AWS_REVIEWER_ROLE_ARN}}
           aws-region: us-east-1
 
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.10.5 # match local `terraform version`
           terraform_wrapper: false # keeps stdout clean for `terraform show -json`3r4
+
+      - run: terraform init -input=false
 
       # -lock=false because the read-only role can't write the state lock file
       - run: terraform plan -input=false -lock=false -out=tfplan
