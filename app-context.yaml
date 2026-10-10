@@ -1,0 +1,7 @@
+app: FinTrack
+purpose: Personal finance tracker handling users' financial data
+sensitive_data: [transactions, account balances, user credentials, receipts]
+internet_facing: [ingress, frontend, backend-api]
+internal_only: [database, prometheus, grafana]
+monthly_budget_usd: 150
+review_priorities: [data protection, least privilege, cost]
