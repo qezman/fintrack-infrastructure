@@ -35,3 +35,10 @@ environments/dev/cribe svc ingress-nginx-controller -n ingress-nginx
 *.logexport
 
 Note.md
+
+plan.json
+reduced.json
+tfplanreview.json
+review.json
+payload.json
+tfplan
