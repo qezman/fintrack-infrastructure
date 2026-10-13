@@ -1,0 +1,98 @@
+name: tf-review
+on:
+  pull_request:
+    branches: [main]
+    paths: ["environments/**", "modules/**"] # terraform changes trigger a review
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    # Dummy values so `plan` can evaluate. Real secrets never reach CI.
+    env:
+      TF_VAR_aws_region: us-east-1
+      TF_VAR_project: fintrack
+      TF_VAR_environment: dev
+      TF_VAR_vpc_cidr: 10.0.0.0/16
+      TF_VAR_availability_zones: '["us-east-1a","us-east-1b"]' # lists are passed as JSON
+      TF_VAR_db_username: dummy_user
+      TF_VAR_db_password: dummy-password-1234 # long enough to pass RDS-style validations
+      TF_VAR_gmail_app_password: dummy
+      TF_VAR_domain_name: example.com
+      TF_VAR_subdomain: app
+      TF_VAR_elb_dns_name: dummy.us-east-1.elb.amazonaws.com
+      TF_VAR_elb_zone_id: Z00000000000
+      TF_VAR_slack_webhook_url: https://example.com/slack
+      TF_VAR_telegram_bot_token: dummy
+      TF_VAR_telegram_chat_id: "0" # the variable is a number; Terraform converts the string
+      TF_VAR_discord_webhook_url: https://example.com/discord
+      TF_VAR_database_url: postgres://dummy
+      TF_VAR_jwt_secret: dummy-jwt-secret
+      TF_VAR_certificate_arn: arn:aws:acm:us-east-1:111111111111:certificate/dummy
+      TF_VAR_grafana_admin_password: dummy-password-1234
+
+    defaults:
+      run:
+        working-directory: environments/dev # where the backend and root module live
+    steps:
+      - uses: actions/checkout@v4
+
+        # Swaps the GitHub OIDC token for short-lived credentials on the read-only role
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{vars.AWS_REVIEWER_ROLE_ARN}}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5 # match local `terraform version`
+          terraform_wrapper: false # keeps stdout clean for `terraform show -json`3r4
+
+      - run: terraform init -input=false
+
+      # -lock=false because the read-only role can't write the state lock file
+      - run: terraform plan -input=false -lock=false -out=tfplan
+
+      - run:
+          terraform show -json tfplan > plan.json
+
+      # Fetch the reviewer engine (public repo) into ./engine
+      - uses: actions/checkout@v4
+        with:
+          repository: qezman/tf-pr-reviewer
+          ref: main
+          path: engine
+
+      # Shrink the plan and redact sensitive values before anything leaves the runner
+      - run: python3 "$GITHUB_WORKSPACE/engine/reviewer/reduce_plan.py" plan.json > reduced.json
+
+      # Ask the LLM for a review. On ANY failure, post a short notice instead of failing the job.
+      - name: Review
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+        run: |
+          E="$GITHUB_WORKSPACE/engine/reviewer"
+          if python3 "$E/review.py" reduced.json "$GITHUB_WORKSPACE/app-context.yaml" "$GITHUB_WORKSPACE/docs/adr" > review.json 2> review.err; then
+            python3 "$E/format_comment.py" review.json > comment.md
+          else
+            cat review.err >&2   # error goes to the job log, never into the PR comment
+            printf '<!-- tf-review -->\n## Terraform review: unavailable\n\nThe automated review could not run on this push. Normal human review applies.\n' > comment.md
+          fi
+
+      # Update earlier comment if it exists, else create one
+      - name: Post comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR=${{ github.event.pull_request.number }}
+          REPO=${{ github.repository }}
+          ID=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq '.[] | select(.body | contains("<!-- tf-review -->")) | .id' | head -n1)
+          if [ -n "$ID" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$ID" -F body=@comment.md
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@comment.md
+          fi
