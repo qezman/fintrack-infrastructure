@@ -55,7 +55,44 @@ jobs:
       # -lock=false because the read-only role can't write the state lock file
       - run: terraform plan -input=false -lock=false -out=tfplan
 
-      - run: terraform show -json tfplan > plan.json
+      - run:
+          terraform show -json tfplan > plan.json
 
-      # Smoke check
-      - run: jq '.resource_changes | length' plan.json
+      # Fetch the reviewer engine (public repo) into ./engine
+      - uses: actions/checkout@v4
+        with:
+          repository: qezman/tf-pr-reviewer
+          ref: main
+          path: engine
+
+      # Shrink the plan and redact sensitive values before anything leaves the runner
+      - run: python3 "$GITHUB_WORKSPACE/engine/reviewer/reduce_plan.py" plan.json > reduced.json
+
+      # Ask the LLM for a review. On ANY failure, post a short notice instead of failing the job.
+      - name: Review
+        env:
+          LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+          LLM_MODEL: ${{ vars.LLM_MODEL }}
+        run: |
+          E="$GITHUB_WORKSPACE/engine/reviewer"
+          if python3 "$E/review.py" reduced.json "$GITHUB_WORKSPACE/app-context.yaml" "$GITHUB_WORKSPACE/docs/adr" > review.json 2> review.err; then
+            python3 "$E/format_comment.py" review.json > comment.md
+          else
+            cat review.err >&2   # error goes to the job log, never into the PR comment
+            printf '<!-- tf-review -->\n## Terraform review: unavailable\n\nThe automated review could not run on this push. Normal human review applies.\n' > comment.md
+          fi
+
+      # Update earlier comment if it exists, else create one
+      - name: Post comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR=${{ github.event.pull_request.number }}
+          REPO=${{ github.repository }}
+          ID=$(gh api "repos/$REPO/issues/$PR/comments" --paginate \
+            --jq '.[] | select(.body | contains("<!-- tf-review -->")) | .id' | head -n1)
+          if [ -n "$ID" ]; then
+            gh api -X PATCH "repos/$REPO/issues/comments/$ID" -F body=@comment.md
+          else
+            gh api -X POST "repos/$REPO/issues/$PR/comments" -F body=@comment.md
+          fi
