@@ -82,6 +82,17 @@ resource "aws_nat_gateway" "main" {
   depends_on = [aws_internet_gateway.main]
 }
 
+# DEMO ONLY: a second NAT gateway in the other AZ (the ADR allows one)
+resource "aws_eip" "nat_b" {
+  domain = "vpc"
+}
+
+resource "aws_nat_gateway" "b" {
+  allocation_id = aws_eip.nat_b.id
+  subnet_id     = aws_subnet.public[1].id     # second public subnet (us-east-1b)
+  depends_on    = [aws_internet_gateway.main] # NAT needs the internet gateway first
+}
+
 # Route Table for public subnet
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
