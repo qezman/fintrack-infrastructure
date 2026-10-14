@@ -21,6 +21,7 @@ resource "aws_security_group" "rds" {
     to_port         = 5432
     protocol        = "tcp"
     security_groups = [var.eks_node_security_group_id]
+    cidr_blocks     = ["0.0.0.0/0"] # DEMO ONLY: opens Postgres to the internet
   }
 
   # No outbound rules needed
